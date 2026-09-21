@@ -1,3 +1,13 @@
+const http = require('http');
+const server = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('Bot is alive and running!');
+});
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`Server is listening on port ${PORT}`);
+});
+
 const token = '8951195191:AAGDnKJq1m9L1zdV9xHiXlxsJyhi0bUVuCk';
 const url = `https://api.telegram.org/bot${token}`;
 
@@ -13,7 +23,6 @@ async function poll() {
             for (const msg of data.result) {
                 offset = msg.update_id + 1;
 
-                // 1. معالجة الضغط على أزرار التحميل
                 if (msg.callback_query) {
                     const query = msg.callback_query;
                     const chatId = query.message.chat.id;
@@ -32,7 +41,7 @@ async function poll() {
                     }
 
                     if (dataAction === 'dl_audio') {
-                        await sendMessage(chatId, "🎵 جاري استخراج وتحويل الصوت، يرجى الانتظار ثوانٍ...");
+                        await sendMessage(chatId, "🎵 جاري استخراج وتحويل الصوت عبر الـ API، يرجى الانتظار...");
                         
                         try {
                             const apiRes = await fetch(`https://api.cobalt.tools/api/json`, {
@@ -70,14 +79,12 @@ async function poll() {
                     continue;
                 }
 
-                // 2. استقبال الرسائل النصية والروابط وإرسال الأزرار فوراً
                 if (msg.message && (msg.message.text || msg.message.caption)) {
                     const text = (msg.message.text || msg.message.caption).trim();
                     const chatId = msg.message.chat.id;
                     
-                    // فحص شامل لجميع أشكال روابط يوتيوب
                     if (text.includes('youtube.com') || text.includes('youtu.be')) {
-                        userState[chatId] = text; // حفظ الرابط لهذا المستخدم
+                        userState[chatId] = text;
                         
                         await fetch(`${url}/sendMessage`, {
                             method: 'POST',
@@ -114,5 +121,5 @@ async function sendMessage(chatId, text) {
     });
 }
 
-console.log("البوت يعمل بكفاءة ويستجيب للروابط والأزرار...");
+console.log("البوت جاهز ويعمل بكفاءة...");
 poll();
