@@ -60,7 +60,12 @@ const server = http.createServer(async (req, res) => {
 
                         const apiRes = await fetch(`https://api.cobalt.tools/api/json`, {
                             method: 'POST',
-                            headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                            headers: { 
+                                'Accept': 'application/json', 
+                                'Content-Type': 'application/json',
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                                'Origin': 'https://cobalt.tools'
+                            },
                             body: JSON.stringify({ 
                                 url: videoUrl, 
                                 downloadMode: 'audio',
@@ -78,11 +83,10 @@ const server = http.createServer(async (req, res) => {
                                 body: JSON.stringify({ chat_id: chatId, audio: audioLink, caption: "✅ تم تحميل الملف الصوتي بنجاح!" })
                             });
                         } else {
-                            // محاولة ثانية بـ API بديلة لضمان عدم الفشل نهائياً
                             await fetch(`${url}/sendMessage`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ chat_id: chatId, text: "❌ عذراً، واجه السيرفر ضغطاً مؤقتاً. جرب إرسال الرابط مرة أخرى." })
+                                body: JSON.stringify({ chat_id: chatId, text: "❌ تعذر استخراج الصوت. تأكد من صحة الرابط وحاول مجدداً." })
                             });
                         }
                     }
