@@ -16,7 +16,6 @@ const server = http.createServer(async (req, res) => {
                     const chatId = msg.chat.id;
                     const text = (msg.text || msg.caption || '').trim();
 
-                    // التحقق مما إذا كان الرابط يخص يوتيوب أو يحتوي على رابط
                     if (text.includes('http://') || text.includes('https://')) {
                         await fetch(`${url}/sendMessage`, {
                             method: 'POST',
@@ -93,6 +92,7 @@ const server = http.createServer(async (req, res) => {
     }
 });
 
+// هذا السطر هو الأهم لأنه يلتقط المنفذ الصحيح من Render (مثل 10000)
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`Server is listening on port ${PORT}`);
