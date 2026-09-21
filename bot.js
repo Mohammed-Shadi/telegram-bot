@@ -1,8 +1,3 @@
-const { createWriteStream } = require('fs');
-const { unlink, readFile } = require('fs/promises');
-const path = require('path');
-const ytdl = require('ytdl-core');
-
 const token = '8951195191:AAGDnKJq1m9L1zdV9xHiXlxsJyhi0bUVuCk';
 const url = `https://api.telegram.org/bot${token}`;
 
@@ -18,7 +13,7 @@ async function poll() {
             for (const msg of data.result) {
                 offset = msg.update_id + 1;
 
-                // معالجة الضغط على الأزرار
+                // معالجة الأزرار
                 if (msg.callback_query) {
                     const query = msg.callback_query;
                     const chatId = query.message.chat.id;
@@ -32,87 +27,81 @@ async function poll() {
                     });
 
                     if (!videoUrl) {
-                        await sendMessage(chatId, "⚠️ الرجاء إرسال رابط يوتيوب جديد أولاً.");
+                        await sendMessage(chatId, "⚠️ الرجاء إرسال رابط يوتيوب من جديد.");
                         continue;
                     }
 
                     if (dataAction === 'dl_audio') {
-                        await sendMessage(chatId, "🎵 جاري تحميل الملف الصوتي، يرجى الانتظار قليلاً...");
+                        await sendMessage(chatId, "🔄 جاري تجهيز واستخراج الملف الصوتي...");
                         
                         try {
-                            const audioPath = path.join(__dirname, `${chatId}_${Date.now()}.mp3`);
-                            
-                            // تحميل الصوت من يوتيوب بجودة عالية
-                            const stream = ytdl(videoUrl, { quality: 'highestaudio', filter: 'audioonly' });
-                            const writeStream = createWriteStream(audioPath);
-                            
-                            stream.pipe(writeStream);
-
-                            writeStream.on('finish', async () => {
-                                try {
-                                    const fileBuffer = await readFile(audioPath);
-                                    const formData = new FormData();
-                                    formData.append('chat_id', chatId);
-                                    
-                                    const blob = new Blob([fileBuffer]);
-                                    formData.append('audio', blob, 'audio.mp3');
-                                    formData.append('title', 'YouTube Audio');
-
-                                    await fetch(`${url}/sendAudio`, {
-                                        method: 'POST',
-                                        body: formData
-                                    });
-
-                                    await unlink(audioPath).catch(() => {});
-                                } catch (uploadErr) {
-                                    await sendMessage(chatId, "❌ حدث خطأ أثناء إرسال الملف الصوتي.");
-                                }
+                            // استخدام خدمة API سريعة ومضمونة لاستخراج رابط التحميل المباشر للصوت
+                            const apiRes = await fetch(`https://api.cobalt.tools/api/json`, {
+                                method: 'POST',
+                                headers: {
+                                    'Accept': 'application/json',
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({
+                                    url: videoUrl,
+                                    isAudioOnly: true,
+                                    downloadMode: 'audio'
+                                })
                             });
 
-                            stream.on('error', async () => {
-                                await sendMessage(chatId, "❌ تعذر تحميل هذا المقطع من يوتيوب.");
-                            });
+                            const apiData = await apiRes.json();
 
+                            if (apiData && apiData.url) {
+                                // إرسال رابط التحميل المباشر للمستخدم فوراً
+                                await fetch(`${url}/sendAudio`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        chat_id: chatId,
+                                        audio: apiData.url,
+                                        caption: "🎵 تم استخراج الملف الصوتي بنجاح بواسطة البوت!"
+                                    })
+                                });
+                            } else {
+                                await sendMessage(chatId, "❌ تعذر استخراج الصوت من هذا الرابط، تأكد أنه رابط يوتيوب صحيح.");
+                            }
                         } catch (err) {
-                            await sendMessage(chatId, "❌ حدث خطأ في معالجة الرابط.");
+                            await sendMessage(chatId, "❌ حدث خطأ أثناء الاتصال بخدمة التحميل.");
                         }
-                    } else if (dataAction === 'dl_video') {
-                        await sendMessage(chatId, "📹 ميزة تحميل الفيديو غير مدعومة حالياً، يرجى استخدام تحميل الصوت (MP3).");
                     }
                     continue;
                 }
 
-                // استقبال الروابط الجديدة
+                // استقبال الرسائل والروابط
                 if (msg.message && msg.message.text) {
                     const text = msg.message.text.trim();
                     const chatId = msg.message.chat.id;
                     
                     if (text.includes('youtube.com/') || text.includes('youtu.be/')) {
-                        userState[chatId] = text; // حفظ الرابط بشكل دقيق للمستخدم
+                        userState[chatId] = text;
                         await fetch(`${url}/sendMessage`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ 
                                 chat_id: chatId, 
-                                text: "📥 تم استلام الرابط بنجاح! اختر صيغة التحميل المطلوبة:",
+                                text: "📥 تم استلام الرابط بنجاح! اضغط على الزر أدناه لتحميل الصوت:",
                                 reply_markup: {
                                     inline_keyboard: [
                                         [
-                                            { text: "📹 فيديو (غير متاح)", callback_data: "dl_video" },
-                                            { text: "🎵 صوت (MP3)", callback_data: "dl_audio" }
+                                            { text: "🎵 تحميل الصوت (MP3)", callback_data: "dl_audio" }
                                         ]
                                     ]
                                 }
                             })
                         });
                     } else {
-                        await sendMessage(chatId, "📚 أهلاً بك! أرسل لي رابط يوتيوب لتحميله كملف صوتي.");
+                        await sendMessage(chatId, " أهلاً بك! أرسل لي رابط يوتيوب وسأقوم بتحويله وتحميله لك كملف صوتي.");
                     }
                 }
             }
         }
     } catch (e) {
-        console.log("خطأ في البولينج:", e);
+        console.log("خطأ:", e);
     }
     setTimeout(poll, 1000);
 }
@@ -125,5 +114,5 @@ async function sendMessage(chatId, text) {
     });
 }
 
-console.log("البوت يعمل بكفاءة وجاهز لاستقبال الروابط...");
+console.log("البوت يعمل بنظام الاستخراج السريع...");
 poll();

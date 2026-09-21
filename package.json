@@ -1,13 +1,10 @@
 {
   "name": "telegram-bot",
-  "version": "2.1.0",
-  "description": "YouTube Downloader and JS Bot",
+  "version": "3.0.0",
+  "description": "YouTube Downloader Bot",
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js"
-  },
-  "dependencies": {
-    "ytdl-core": "^4.11.5"
   },
   "engines": {
     "node": ">=18.0.0"
