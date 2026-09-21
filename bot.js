@@ -1,6 +1,6 @@
 const http = require('http');
 
-const token = '8951195191:AAGDnKJq1m9L1zdV9xHiXlxsJyhi0bUVuCk';
+const token = '8951195191:AAFpLCFTJegNKhil2b46ezlWRElEfw4cIYg';
 const url = `https://api.telegram.org/bot${token}`;
 
 const server = http.createServer(async (req, res) => {
