@@ -61,7 +61,12 @@ const server = http.createServer(async (req, res) => {
                         const apiRes = await fetch(`https://api.cobalt.tools/api/json`, {
                             method: 'POST',
                             headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ url: videoUrl, isAudioOnly: true, downloadMode: 'audio' })
+                            body: JSON.stringify({ 
+                                url: videoUrl, 
+                                isAudioOnly: true, 
+                                downloadMode: 'audio',
+                                filenameStyle: 'nered'
+                            })
                         });
                         const apiData = await apiRes.json();
 
@@ -75,7 +80,7 @@ const server = http.createServer(async (req, res) => {
                             await fetch(`${url}/sendMessage`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ chat_id: chatId, text: "❌ تعذر استخراج الصوت من الرابط." })
+                                body: JSON.stringify({ chat_id: chatId, text: "❌ تعذر استخراج الصوت من الرابط. تأكد من صحة الرابط وحاول مجدداً." })
                             });
                         }
                     }
