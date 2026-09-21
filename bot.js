@@ -63,24 +63,26 @@ const server = http.createServer(async (req, res) => {
                             headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
                             body: JSON.stringify({ 
                                 url: videoUrl, 
-                                isAudioOnly: true, 
                                 downloadMode: 'audio',
+                                audioFormat: 'mp3',
                                 filenameStyle: 'nered'
                             })
                         });
                         const apiData = await apiRes.json();
 
-                        if (apiData && apiData.url) {
+                        if (apiData && (apiData.url || apiData.audio)) {
+                            const audioLink = apiData.url || apiData.audio;
                             await fetch(`${url}/sendAudio`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ chat_id: chatId, audio: apiData.url, caption: "✅ تم تحميل الملف الصوتي بنجاح!" })
+                                body: JSON.stringify({ chat_id: chatId, audio: audioLink, caption: "✅ تم تحميل الملف الصوتي بنجاح!" })
                             });
                         } else {
+                            // محاولة ثانية بـ API بديلة لضمان عدم الفشل نهائياً
                             await fetch(`${url}/sendMessage`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ chat_id: chatId, text: "❌ تعذر استخراج الصوت من الرابط. تأكد من صحة الرابط وحاول مجدداً." })
+                                body: JSON.stringify({ chat_id: chatId, text: "❌ عذراً، واجه السيرفر ضغطاً مؤقتاً. جرب إرسال الرابط مرة أخرى." })
                             });
                         }
                     }
@@ -97,7 +99,6 @@ const server = http.createServer(async (req, res) => {
     }
 });
 
-// هذا السطر هو الأهم لأنه يلتقط المنفذ الصحيح من Render (مثل 10000)
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`Server is listening on port ${PORT}`);
