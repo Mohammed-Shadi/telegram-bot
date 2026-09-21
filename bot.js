@@ -1,9 +1,12 @@
+const { createWriteStream } = require('fs');
+const { unlink } = require('fs/promises');
+const path = require('path');
+const ytdl = require('ytdl-core');
+
 const token = '8951195191:AAGDnKJq1m9L1zdV9xHiXlxsJyhi0bUVuCk';
 const url = `https://api.telegram.org/bot${token}`;
 
 let offset = 0;
-
-// تخزين مؤقت للروابط لكل مستخدم
 const userState = {};
 
 async function poll() {
@@ -15,14 +18,13 @@ async function poll() {
             for (const msg of data.result) {
                 offset = msg.update_id + 1;
 
-                // 1. معالجة الضغط على الأزرار (Callback Queries)
+                // معالجة الضغط على الأزرار
                 if (msg.callback_query) {
                     const query = msg.callback_query;
                     const chatId = query.message.chat.id;
-                    const dataAction = query.data; // مثل 'dl_video' أو 'dl_audio'
+                    const dataAction = query.data;
                     const videoUrl = userState[chatId];
 
-                    // الرد على الضغطة لإيقاف علامة التحميل في الزر
                     await fetch(`${url}/answerCallbackQuery`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -34,83 +36,93 @@ async function poll() {
                         continue;
                     }
 
-                    if (dataAction === 'dl_video') {
-                        await sendMessage(chatId, `📹 جاري تجهيز تحميل الفيديو...\nالرابط: ${videoUrl}`);
-                        // TODO: أضف هنا كود تحميل وتحويل وإرسال الفيديو للمستخدم
-                    } else if (dataAction === 'dl_audio') {
-                        await sendMessage(chatId, `🎵 جاري استخراج وتحويل الملف الصوتي (MP3)...\nالرابط: ${videoUrl}`);
-                        // TODO: أضف هنا كود استخراج الصوت وإرساله للمستخدم
+                    if (dataAction === 'dl_audio') {
+                        await sendMessage(chatId, "🎵 جاري تحميل وتحويل الملف الصوتي، قد يستغرق ذلك دقيقة...");
+                        
+                        try {
+                            const audioPath = path.join(__dirname, `${chatId}.mp3`);
+                            
+                            // تحميل الصوت من يوتيوب
+                            const stream = ytdl(videoUrl, { quality: highestaudio, filter: 'audioonly' });
+                            const writeStream = createWriteStream(audioPath);
+                            
+                            stream.pipe(writeStream);
+
+                            writeStream.on('finish', async () => {
+                                // إرسال الملف الصوتي للمستخدم
+                                const formData = new FormData();
+                                formData.append('chat_id', chatId);
+                                
+                                const fileBlob = new Blob([await require('fs').promises.readFile(audioPath)]);
+                                formData.append('audio', fileBlob, 'audio.mp3');
+                                formData.append('title', 'YouTube Audio');
+
+                                await fetch(`${url}/sendAudio`, {
+                                    method: 'POST',
+                                    body: formData
+                                });
+
+                                await sendMessage(chatId, "✅ تم إرسال الملف الصوتي بنجاح!");
+                                
+                                // حذف الملف المؤقت من السيرفر لتوفير المساحة
+                                await unlink(audioPath).catch(() => {});
+                            });
+
+                            stream.on('error', async () => {
+                                await sendMessage(chatId, "❌ حدث خطأ أثناء تحميل الصوت، يرجى المحاولة لاحقاً.");
+                            });
+
+                        } catch (err) {
+                            await sendMessage(chatId, "❌ تعذر معالجة هذا الرابط.");
+                        }
+                    } else if (dataAction === 'dl_video') {
+                        await sendMessage(chatId, "📹 تحميل الفيديوهات بحجم كبير يتطلب مساحة سيرفر إضافية، جارٍ التركيز على الصوت حالياً.");
                     }
                     continue;
                 }
 
-                // 2. معالجة الرسائل النصية العادية
+                // استقبال الروابط
                 if (msg.message && msg.message.text) {
                     const text = msg.message.text.trim();
                     const chatId = msg.message.chat.id;
-                    const lowerText = text.toLowerCase();
                     
-                    console.log("رسالة جديدة وصلت: " + text);
-                    
-                    // التحقق مما إذا كان النص رابط يوتيوب
                     if (text.includes('youtube.com/') || text.includes('youtu.be/')) {
-                        // حفظ الرابط مؤقتاً لهذا المستخدم
                         userState[chatId] = text;
-
-                        // إرسال رسالة مع أزرار الاختيار (فيديو أو صوت)
                         await fetch(`${url}/sendMessage`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ 
                                 chat_id: chatId, 
-                                text: "📥 تم استلام الرابط بنجاح! اختر صيغة التحميل المطلوبة:",
+                                text: "📥 تم استلام الرابط! اختر الصيغة:",
                                 reply_markup: {
                                     inline_keyboard: [
                                         [
-                                            { text: "📹 فيديو (MP4)", callback_data: "dl_video" },
+                                            { text: "📹 فيديو (قريباً)", callback_data: "dl_video" },
                                             { text: "🎵 صوت (MP3)", callback_data: "dl_audio" }
                                         ]
                                     ]
                                 }
                             })
                         });
-                    } 
-                    // الردود القديمة الخاصة بموسوعة الجافا سكريبت
-                    else {
-                        let replyText = "";
-
-                        if (lowerText.includes('var') || lowerText.includes('let') || lowerText.includes('const') || lowerText.includes('متغير')) {
-                            replyText = "💡 **1. المتغيرات (Variables):**\nتُستخدم لتخزين القيم.\n- `let`: لتخزين بيانات قابلة للتغيير.\n- `const`: لقيم ثابتة لا تتغير.";
-                        } 
-                        else if (lowerText.includes('function') || lowerText.includes('دال') || lowerText.includes('دوال')) {
-                            replyText = "⚡ **2. الدوال (Functions):**\nكتل برمجية لتنفيذ مهام محددة.";
-                        } 
-                        else {
-                            replyText = `📚 **موسوعة JavaScript وبوت التحميل:**\nأرسل لي رابط يوتيوب لتحميله، أو اسألني عن أساسيات جافا سكريبت (متغيرات، دوال، مصفوفات...).`;
-                        }
-                        
-                        await sendMessage(chatId, replyText, 'Markdown');
+                    } else {
+                        await sendMessage(chatId, "📚 أرسل رابط يوتيوب لتحميله كملف صوتي.");
                     }
                 }
             }
         }
     } catch (e) {
-        console.log("خطأ بالاتصال", e);
+        console.log("خطأ:", e);
     }
     setTimeout(poll, 1000);
 }
 
-// دالة مساعدة لإرسال الرسائل بسهولة
-async function sendMessage(chatId, text, parseMode = null) {
-    const body = { chat_id: chatId, text: text };
-    if (parseMode) body.parse_mode = parseMode;
-
+async function sendMessage(chatId, text) {
     await fetch(`${url}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+        body: JSON.stringify({ chat_id: chatId, text: text })
     });
 }
 
-console.log("البوت المحدث يعمل الآن...");
+console.log("بوت التحميل يعمل بكفاءة...");
 poll();
