@@ -9,10 +9,11 @@ async function poll() {
         const res = await fetch(`${url}/getUpdates?offset=${offset}&timeout=10`);
         const data = await res.json();
         
-        if (data.result) {
+        if (data && data.result) {
             for (const msg of data.result) {
                 offset = msg.update_id + 1;
 
+                // 1. معالجة الضغط على أزرار التحميل
                 if (msg.callback_query) {
                     const query = msg.callback_query;
                     const chatId = query.message.chat.id;
@@ -26,15 +27,14 @@ async function poll() {
                     });
 
                     if (!videoUrl) {
-                        await sendMessage(chatId, "⚠️ الرجاء إرسال رابط يوتيوب من جديد.");
+                        await sendMessage(chatId, "⚠️ انتهت صلاحية الرابط، الرجاء إرسال رابط يوتيوب من جديد.");
                         continue;
                     }
 
                     if (dataAction === 'dl_audio') {
-                        await sendMessage(chatId, "🎵 جاري استخراج وتحويل الصوت عبر الـ API، يرجى الانتظار...");
+                        await sendMessage(chatId, "🎵 جاري استخراج وتحويل الصوت، يرجى الانتظار ثوانٍ...");
                         
                         try {
-                            // 👇 [هنا تم إضافة وتفعيل الـ API الخارجي لجلب الصوت مباشرة] 👇
                             const apiRes = await fetch(`https://api.cobalt.tools/api/json`, {
                                 method: 'POST',
                                 headers: {
@@ -50,7 +50,6 @@ async function poll() {
 
                             const apiData = await apiRes.json();
 
-                            // التحقق من نجاح جلب الرابط من الـ API وإرساله للمستخدم
                             if (apiData && apiData.url) {
                                 await fetch(`${url}/sendAudio`, {
                                     method: 'POST',
@@ -64,7 +63,6 @@ async function poll() {
                             } else {
                                 await sendMessage(chatId, "❌ تعذر استخراج الصوت من هذا الرابط.");
                             }
-
                         } catch (err) {
                             await sendMessage(chatId, "❌ حدث خطأ أثناء الاتصال بخدمة التحميل.");
                         }
@@ -72,35 +70,38 @@ async function poll() {
                     continue;
                 }
 
-                if (msg.message && msg.message.text) {
-                    const text = msg.message.text.trim();
+                // 2. استقبال الرسائل النصية والروابط وإرسال الأزرار فوراً
+                if (msg.message && (msg.message.text || msg.message.caption)) {
+                    const text = (msg.message.text || msg.message.caption).trim();
                     const chatId = msg.message.chat.id;
                     
-                    if (text.includes('youtube.com/') || text.includes('youtu.be/')) {
-                        userState[chatId] = text;
+                    // فحص شامل لجميع أشكال روابط يوتيوب
+                    if (text.includes('youtube.com') || text.includes('youtu.be')) {
+                        userState[chatId] = text; // حفظ الرابط لهذا المستخدم
+                        
                         await fetch(`${url}/sendMessage`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ 
                                 chat_id: chatId, 
-                                text: "📥 تم استلام الرابط بنجاح! اضغط للتحميل:",
+                                text: "📥 تم استلام الرابط بنجاح! اختر صيغة التحميل:",
                                 reply_markup: {
                                     inline_keyboard: [
                                         [
-                                            { text: "🎵 صوت (MP3)", callback_data: "dl_audio" }
+                                            { text: "🎵 تحميل الصوت (MP3)", callback_data: "dl_audio" }
                                         ]
                                     ]
                                 }
                             })
                         });
-                    } else {
-                        await sendMessage(chatId, " أهلاً بك! أرسل رابط يوتيوب لتحميله كملف صوتي.");
+                    } else if (msg.message.text && !msg.message.text.startsWith('/')) {
+                        await sendMessage(chatId, " أهلاً بك! أرسل رابط يوتيوب لتحويله وتحميله كملف صوتي.");
                     }
                 }
             }
         }
     } catch (e) {
-        console.log("خطأ:", e);
+        console.log("خطأ في الاتصال:", e);
     }
     setTimeout(poll, 1000);
 }
@@ -113,5 +114,5 @@ async function sendMessage(chatId, text) {
     });
 }
 
-console.log("البوت جاهز ويعمل بالـ API بثبات...");
+console.log("البوت يعمل بكفاءة ويستجيب للروابط والأزرار...");
 poll();
